@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PhishGuard — Control Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="dash.css">
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">PHISH<span>GUARD</span></div>
+    <div class="version">v2.1 — SPF/DKIM</div>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill">
+      <div class="pulse idle" id="pulse-dot"></div>
+      <span id="status-text">IDLE</span>
+    </div>
+    <div id="clock">--:--:--</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">Monitor</div>
+      <div class="nav-item active" data-page="overview">
+        <span class="nav-icon">◈</span> Overview
+      </div>
+      <div class="nav-item" data-page="threats">
+        <span class="nav-icon">⚑</span> Threat Log
+        <span class="nav-badge" id="threat-badge">0</span>
+      </div>
+      <div class="nav-item" data-page="activity">
+        <span class="nav-icon">◎</span> Activity
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">
+      <div class="nav-label">Control</div>
+      <div class="nav-item" data-page="scanner">
+        <span class="nav-icon">▶</span> Run Scanner
+      </div>
+      <div class="nav-item" data-page="settings">
+        <span class="nav-icon">⚙</span> Settings
+      </div>
+      <div class="nav-item" data-page="config">
+        <span class="nav-icon">☰</span> Config / .env
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">
+      <div class="nav-label">Info</div>
+      <div class="nav-item" data-page="about">
+        <span class="nav-icon">◉</span> About
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div class="page active" id="page-overview">
+      <div class="section-head">
+        <div class="section-title">OVERVIEW</div>
+        <div class="section-sub">Session summary</div>
+      </div>
+
+      <div class="stat-row">
+        <div class="stat-card info">
+          <div class="stat-label">Emails scanned</div>
+          <div class="stat-value" id="stat-scanned">0</div>
+          <div class="stat-delta">this session</div>
+        </div>
+        <div class="stat-card danger">
+          <div class="stat-label">Threats found</div>
+          <div class="stat-value" id="stat-threats">0</div>
+          <div class="stat-delta">quarantined</div>
+        </div>
+        <div class="stat-card warn">
+          <div class="stat-label">SPF / DKIM fail</div>
+          <div class="stat-value" id="stat-header-fail">0</div>
+          <div class="stat-delta">header issues</div>
+        </div>
+        <div class="stat-card ok">
+          <div class="stat-label">Clean emails</div>
+          <div class="stat-value" id="stat-clean">0</div>
+          <div class="stat-delta">passed all checks</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Recent activity bar chart -->
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Scan activity — last 7 scans</div>
+          </div>
+          <div class="panel-body">
+            <div class="bar-chart" id="bar-chart">
+              <div class="empty">No scan data yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Check breakdown donut -->
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Check breakdown</div>
+          </div>
+          <div class="panel-body">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 80 80" width="80" height="80" style="flex-shrink:0">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="#1c2330" stroke-width="12"/>
+                <circle id="donut-vt"   cx="40" cy="40" r="32" fill="none" stroke="#ff3d57" stroke-width="12"
+                  stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray 0.5s"/>
+                <circle id="donut-spf"  cx="40" cy="40" r="32" fill="none" stroke="#ffab00" stroke-width="12"
+                  stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray 0.5s"/>
+                <circle id="donut-dkim" cx="40" cy="40" r="32" fill="none" stroke="#00d4ff" stroke-width="12"
+                  stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray 0.5s"/>
+              </svg>
+              <div class="donut-legend">
+                <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> VirusTotal hits: <b id="leg-vt" style="color:var(--red);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> SPF failures: <b id="leg-spf" style="color:var(--amber);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div> DKIM failures: <b id="leg-dkim" style="color:var(--accent);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div> Clean: <b id="leg-clean" style="color:var(--green);margin-left:4px">0</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent threats mini table -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Recent threats</div>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="showPage('threats')">View all →</button>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <table class="log-table" id="recent-table">
+            <thead>
+              <tr>
+                <th>Time</th><th>Sender</th><th>Subject</th><th>SPF</th><th>DKIM</th><th>Score</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="recent-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:28px">No threats detected yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ THREAT LOG ═══ -->
+    <div class="page" id="page-threats">
+      <div class="section-head">
+        <div class="section-title">THREAT LOG</div>
+        <div class="section-sub">All flagged emails</div>
+        <button class="btn btn-danger" style="margin-left:auto;font-size:11px;padding:5px 12px" onclick="clearThreats()">Clear log</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Flagged emails</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text3)" id="threat-count-label">0 records</div>
+        </div>
+        <div style="padding:0">
+          <table class="log-table" id="threat-table">
+            <thead>
+              <tr>
+                <th>Time</th><th>Sender</th><th>Subject</th><th>SPF</th><th>DKIM</th><th>VirusTotal</th><th>Score</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="threat-tbody">
+              <tr><td colspan="8" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:40px">No threats logged yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ACTIVITY ═══ -->
+    <div class="page" id="page-activity">
+      <div class="section-head">
+        <div class="section-title">ACTIVITY</div>
+        <div class="section-sub">Console output</div>
+        <button class="btn btn-ghost" style="margin-left:auto;font-size:11px;padding:5px 12px" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">System log</div></div>
+        <div class="panel-body">
+          <div class="terminal" id="terminal-log">
+            <span class="t-info">// PhishGuard initialized. Run a scan to begin.</span>
+          </div>
+        </div>
+      </div>
+
+      <br/>
+      <div class="panel" style="margin-top:0">
+        <div class="panel-head"><div class="panel-title">All scanned emails — this session</div></div>
+        <div style="padding:0">
+          <table class="log-table">
+            <thead><tr><th>Time</th><th>Sender</th><th>Subject</th><th>SPF</th><th>DKIM</th><th>Score</th><th>Result</th></tr></thead>
+            <tbody id="all-tbody">
+              <tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:32px">No emails scanned yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ RUN SCANNER ═══ -->
+    <div class="page" id="page-scanner">
+      <div class="section-head">
+        <div class="section-title">RUN SCANNER</div>
+        <div class="section-sub">Manually trigger a scan</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Scan controls</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">Scan mode</div>
+              <select id="scan-mode">
+                <option value="full">Full scan — SPF + DKIM + VirusTotal</option>
+                <option value="headers">Headers only — SPF + DKIM</option>
+                <option value="urls">URLs only — VirusTotal</option>
+              </select>
+              <div class="field-hint">Full scan runs all three checks in sequence.</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Email folder</div>
+              <select id="scan-folder">
+                <option value="inbox">INBOX</option>
+                <option value="spam">SPAM</option>
+                <option value="all">ALL MAIL</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Max emails per scan</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="50" value="10" id="max-emails" oninput="document.getElementById('max-val').textContent=this.value"/>
+                <span class="slider-val" id="max-val">10</span>
+              </div>
+            </div>
+            <br/>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="run-btn" onclick="runScan()">▶ Run scan now</button>
+              <button class="btn btn-ghost" onclick="simulateScan()">◈ Run simulation</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Auto-scheduler</div></div>
+          <div class="panel-body">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Enable auto-scan</div>
+                <div class="toggle-desc">Runs scan on the interval below</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" id="auto-scan-toggle" onchange="toggleAutoScan(this.checked)"/>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <br/>
+            <div class="field-group">
+              <div class="field-label">Interval (minutes)</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="60" value="5" id="interval-slider" oninput="document.getElementById('interval-val').textContent=this.value"/>
+                <span class="slider-val" id="interval-val">5</span>
+              </div>
+              <div class="field-hint">Next run: <span id="next-run" style="font-family:var(--mono);color:var(--accent)">—</span></div>
+            </div>
+            <br/>
+            <div class="field-group">
+              <div class="field-label">Scheduler status</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="scheduler-status">● STOPPED</div>
+            </div>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn btn-ghost" onclick="stopScheduler()">■ Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scan progress -->
+      <div class="panel" id="scan-progress-panel" style="display:none">
+        <div class="panel-head"><div class="panel-title">Scan in progress</div></div>
+        <div class="panel-body">
+          <div class="terminal" id="scan-terminal" style="height:220px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SETTINGS ═══ -->
+    <div class="page" id="page-settings">
+      <div class="section-head">
+        <div class="section-title">SETTINGS</div>
+        <div class="section-sub">Detection thresholds and behaviour</div>
+      </div>
+      <div class="control-grid">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Threat scoring</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">Quarantine threshold</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="10" value="3" id="thresh-slider" oninput="document.getElementById('thresh-val').textContent=this.value"/>
+                <span class="slider-val" id="thresh-val">3</span>
+              </div>
+              <div class="field-hint">Email quarantined when score ≥ this value.</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:var(--mono);font-size:11px;line-height:2;margin-top:8px">
+              <div><span style="color:var(--red)">DKIM fail</span> <span style="color:var(--text3)">............</span> +3</div>
+              <div><span style="color:var(--amber)">DKIM none</span> <span style="color:var(--text3)">............</span> +1</div>
+              <div><span style="color:var(--red)">SPF hard fail</span> <span style="color:var(--text3)">...........</span> +3</div>
+              <div><span style="color:var(--amber)">SPF soft fail</span> <span style="color:var(--text3)">...........</span> +1</div>
+              <div><span style="color:var(--red)">Malicious URL (VT)</span> <span style="color:var(--text3)">......</span> +5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Checks enabled</div></div>
+          <div class="panel-body">
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">SPF verification</div>
+                <div class="toggle-desc">DNS lookup on sender domain</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked id="tog-spf"/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">DKIM verification</div>
+                <div class="toggle-desc">Cryptographic signature check</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked id="tog-dkim"/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">VirusTotal URL scan</div>
+                <div class="toggle-desc">API rate limit: 4 req / min (free)</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked id="tog-vt"/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Auto-quarantine</div>
+                <div class="toggle-desc">Move threats automatically</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked id="tog-quarantine"/><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-row">
+              <div>
+                <div class="toggle-label">Email alerts</div>
+                <div class="toggle-desc">Send alert to ALERT_EMAIL</div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked id="tog-alert"/><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveSettings()">✓ Save settings</button>
+        <button class="btn btn-ghost" onclick="resetSettings()">↺ Reset defaults</button>
+      </div>
+    </div>
+
+    <!-- ═══ CONFIG / .env ═══ -->
+    <div class="page" id="page-config">
+      <div class="section-head">
+        <div class="section-title">CONFIG / .ENV</div>
+        <div class="section-sub">Environment variable editor</div>
+      </div>
+      <div class="control-grid">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Email credentials</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">EMAIL_ADDRESS</div>
+              <input type="email" id="cfg-email" placeholder="you@gmail.com"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">EMAIL_PASSWORD (App Password)</div>
+              <input type="password" id="cfg-pass" placeholder="xxxx xxxx xxxx xxxx"/>
+              <div class="field-hint">Gmail → My Account → Security → App Passwords</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">IMAP_SERVER</div>
+              <input type="text" id="cfg-imap" value="imap.gmail.com"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">IMAP_PORT</div>
+              <input type="number" id="cfg-imap-port" value="993"/>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Alert &amp; API keys</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">ALERT_EMAIL</div>
+              <input type="email" id="cfg-alert-email" placeholder="security@yourorg.com"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">SMTP_USER</div>
+              <input type="email" id="cfg-smtp-user" placeholder="sender@gmail.com"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">SMTP_PASSWORD</div>
+              <input type="password" id="cfg-smtp-pass" placeholder="App password for SMTP_USER"/>
+            </div>
+            <div class="field-group">
+              <div class="field-label">VIRUSTOTAL_API_KEY</div>
+              <input type="password" id="cfg-vt-key" placeholder="Your VirusTotal API key"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- .env preview -->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">.env file preview</div>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="copyEnv()">⎘ Copy</button>
+        </div>
+        <div class="panel-body">
+          <div class="env-preview" id="env-preview">—</div>
+        </div>
+      </div>
+
+      <br/>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="generateEnv()">⬇ Generate .env</button>
+        <button class="btn btn-ghost" onclick="refreshEnvPreview()">↺ Refresh preview</button>
+      </div>
+    </div>
+
+    <!-- ═══ ABOUT ═══ -->
+    <div class="page" id="page-about">
+      <div class="section-head">
+        <div class="section-title">ABOUT</div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">System modules</div></div>
+          <div class="panel-body" style="padding:0">
+            <table class="log-table">
+              <thead><tr><th>File</th><th>Role</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">email_handler.py</td><td>IMAP connect + fetch + raw bytes</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">spf_dkim_check.py</td><td>SPF DNS eval + DKIM verify</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">phishing_detection.py</td><td>VirusTotal URL scan</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">quarantine.py</td><td>Gmail label / folder move</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">alert.py</td><td>SMTP alert email</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">logger.py</td><td>SQLite flagged email log</td><td><span class="badge pass">active</span></td></tr>
+                <tr><td class="mono">main.py</td><td>Orchestrator + scorer</td><td><span class="badge pass">active</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Dependencies</div></div>
+          <div class="panel-body" style="padding:0">
+            <table class="log-table">
+              <thead><tr><th>Package</th><th>Purpose</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">dkimpy</td><td>DKIM signature verification</td></tr>
+                <tr><td class="mono">dnspython</td><td>SPF DNS resolution</td></tr>
+                <tr><td class="mono">requests</td><td>VirusTotal API calls</td></tr>
+                <tr><td class="mono">python-dotenv</td><td>Load .env credentials</td></tr>
+                <tr><td class="mono">imaplib</td><td>Email fetching (stdlib)</td></tr>
+                <tr><td class="mono">sqlite3</td><td>Threat logging (stdlib)</td></tr>
+                <tr><td class="mono">smtplib</td><td>Alert emails (stdlib)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Quick start</div></div>
+        <div class="panel-body">
+          <div class="env-preview" style="line-height:2.2">
+<span class="env-key"># 1. Install dependencies</span>
+pip install dkimpy dnspython requests python-dotenv
+
+<span class="env-key"># 2. Create your .env file (use Config page above to generate it)</span>
+cp .env.example .env
+
+<span class="env-key"># 3. Run a single scan</span>
+python main.py
+
+<span class="env-key"># 4. Or use this dashboard — click Run Scanner → Run simulation</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Threat detail modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Threat detail</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toasts"></div>
+
+<script src="dash.js"></script>
+
+</body>
+</html>

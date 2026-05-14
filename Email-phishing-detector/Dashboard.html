@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PhishGuard — Control Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:#0a0c0f;--bg2:#0f1218;--bg3:#161b24;--bg4:#1c2330;
+    --border:#232b38;--border2:#2e3a4a;
+    --text:#c8d4e0;--text2:#7a8fa8;--text3:#4a5a6e;
+    --accent:#00d4ff;--accent2:#0098cc;
+    --green:#00e676;--green2:#00a854;
+    --red:#ff3d57;--red2:#b22234;
+    --amber:#ffab00;--amber2:#b37700;
+    --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999;}
+
+  /* Topbar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+  .topbar-left{display:flex;align-items:center;gap:16px;}
+  .logo{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent);letter-spacing:.08em;}
+  .logo span{color:var(--text2);font-weight:400;}
+  .version{font-family:var(--mono);font-size:10px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);padding:2px 7px;border-radius:3px;}
+  .topbar-right{display:flex;align-items:center;gap:20px;}
+  .status-pill{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--text2);}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+  .pulse.idle{background:var(--text3);box-shadow:none;animation:none;}
+  .pulse.scanning{background:var(--accent);animation:pulse-blue 2s infinite;}
+  .pulse.error{background:var(--red);animation:none;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,230,118,.5);}70%{box-shadow:0 0 0 6px rgba(0,230,118,0);}100%{box-shadow:0 0 0 0 rgba(0,230,118,0);}}
+  @keyframes pulse-blue{0%{box-shadow:0 0 0 0 rgba(0,212,255,.5);}70%{box-shadow:0 0 0 6px rgba(0,212,255,0);}100%{box-shadow:0 0 0 0 rgba(0,212,255,0);}}
+  #clock{font-family:var(--mono);font-size:12px;color:var(--text3);}
+  .api-status{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid;}
+  .api-status.connected{color:var(--green);border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.08);}
+  .api-status.disconnected{color:var(--red);border-color:rgba(255,61,87,.3);background:rgba(255,61,87,.08);}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 52px);}
+  .sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:20px 0;}
+  .nav-section{margin-bottom:8px;}
+  .nav-label{font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase;padding:0 20px 8px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;font-size:13px;color:var(--text2);border-left:2px solid transparent;transition:all .15s;}
+  .nav-item:hover{color:var(--text);background:var(--bg3);}
+  .nav-item.active{color:var(--accent);background:rgba(0,212,255,.06);border-left-color:var(--accent);}
+  .nav-icon{font-size:14px;width:16px;text-align:center;}
+  .nav-badge{margin-left:auto;font-family:var(--mono);font-size:10px;background:var(--red2);color:#fff;padding:1px 6px;border-radius:10px;}
+  .sidebar-divider{height:1px;background:var(--border);margin:12px 0;}
+  .main{background:var(--bg);padding:24px 28px;overflow-y:auto;}
+
+  /* Pages */
+  .page{display:none;}.page.active{display:block;}
+  .section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;}
+  .section-title{font-family:var(--mono);font-size:14px;color:var(--text);font-weight:600;letter-spacing:.04em;}
+  .section-sub{font-size:12px;color:var(--text3);}
+
+  /* Stat cards */
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:16px 18px;position:relative;overflow:hidden;}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .stat-card.danger::before{background:var(--red);}
+  .stat-card.warn::before{background:var(--amber);}
+  .stat-card.ok::before{background:var(--green);}
+  .stat-card.info::before{background:var(--accent);}
+  .stat-label{font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px;}
+  .stat-value{font-family:var(--mono);font-size:28px;font-weight:600;line-height:1;}
+  .stat-card.danger .stat-value{color:var(--red);}
+  .stat-card.warn   .stat-value{color:var(--amber);}
+  .stat-card.ok     .stat-value{color:var(--green);}
+  .stat-card.info   .stat-value{color:var(--accent);}
+  .stat-delta{font-size:11px;color:var(--text3);margin-top:6px;font-family:var(--mono);}
+
+  /* Grid/Panel */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  .panel{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg3);}
+  .panel-title{font-family:var(--mono);font-size:11px;color:var(--text2);font-weight:500;letter-spacing:.08em;text-transform:uppercase;}
+  .panel-body{padding:16px;}
+
+  /* Table */
+  .log-table{width:100%;border-collapse:collapse;}
+  .log-table th{font-family:var(--mono);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;padding:0 12px 10px;text-align:left;border-bottom:1px solid var(--border);}
+  .log-table td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);vertical-align:middle;}
+  .log-table tr:last-child td{border-bottom:none;}
+  .log-table tr:hover td{background:var(--bg3);}
+  .log-table td.mono{font-family:var(--mono);font-size:11px;}
+  .log-table td.sender{color:var(--text);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .log-table td.subject{max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;font-weight:500;}
+  .badge.pass{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
+  .badge.fail{background:rgba(255,61,87,.12);color:var(--red);border:1px solid rgba(255,61,87,.25);}
+  .badge.warn{background:rgba(255,171,0,.12);color:var(--amber);border:1px solid rgba(255,171,0,.25);}
+  .badge.none{background:rgba(122,143,168,.1);color:var(--text3);border:1px solid var(--border);}
+  .badge.info{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.25);}
+
+  /* Score bar */
+  .score-bar-wrap{display:flex;align-items:center;gap:8px;}
+  .score-bar-track{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+  .score-bar-fill{height:100%;border-radius:2px;transition:width .4s ease;}
+  .score-num{font-family:var(--mono);font-size:11px;min-width:24px;text-align:right;}
+
+  /* Controls */
+  .control-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+  .field-group{margin-bottom:14px;}
+  .field-label{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;}
+  .field-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+  input[type="text"],input[type="password"],input[type="number"],input[type="email"],select{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 12px;outline:none;transition:border-color .15s;}
+  input:focus,select:focus{border-color:var(--accent);}
+  select option{background:var(--bg2);}
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-label{font-size:13px;color:var(--text);}
+  .toggle-desc{font-size:11px;color:var(--text3);margin-top:2px;}
+  .toggle{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:var(--bg4);border-radius:20px;border:1px solid var(--border2);cursor:pointer;transition:all .2s;}
+  .toggle-slider::before{content:'';position:absolute;width:14px;height:14px;left:2px;top:2px;background:var(--text3);border-radius:50%;transition:all .2s;}
+  .toggle input:checked + .toggle-slider{background:rgba(0,212,255,.2);border-color:var(--accent);}
+  .toggle input:checked + .toggle-slider::before{transform:translateX(16px);background:var(--accent);}
+  .slider-row{display:flex;align-items:center;gap:12px;}
+  input[type="range"]{flex:1;appearance:none;-webkit-appearance:none;height:3px;background:var(--bg4);border-radius:2px;outline:none;border:none;padding:0;}
+  input[type="range"]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;background:var(--accent);border-radius:50%;cursor:pointer;border:2px solid var(--bg2);}
+  .slider-val{font-family:var(--mono);font-size:13px;color:var(--accent);min-width:28px;text-align:right;}
+
+  /* Buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:4px;font-family:var(--mono);font-size:12px;font-weight:500;border:none;cursor:pointer;transition:all .15s;letter-spacing:.04em;}
+  .btn-primary{background:var(--accent);color:var(--bg);}
+  .btn-primary:hover{background:#33dcff;}
+  .btn-primary:disabled{background:var(--text3);cursor:not-allowed;}
+  .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+  .btn-ghost:hover{border-color:var(--text2);color:var(--text);}
+  .btn-danger{background:rgba(255,61,87,.15);color:var(--red);border:1px solid rgba(255,61,87,.3);}
+  .btn-danger:hover{background:rgba(255,61,87,.25);}
+  .btn-success{background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);}
+  .btn-success:hover{background:rgba(0,230,118,.25);}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;}
+
+  /* Terminal */
+  .terminal{background:var(--bg);border:1px solid var(--border);border-radius:4px;font-family:var(--mono);font-size:11px;color:var(--text2);padding:12px 14px;height:220px;overflow-y:auto;line-height:1.7;}
+  .terminal .t-time{color:var(--text3);}
+  .terminal .t-ok{color:var(--green);}
+  .terminal .t-warn{color:var(--amber);}
+  .terminal .t-err{color:var(--red);}
+  .terminal .t-info{color:var(--accent);}
+
+  /* Bar chart */
+  .bar-chart{display:flex;align-items:flex-end;gap:6px;height:90px;padding:0 2px;}
+  .bar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;}
+  .bar{width:100%;border-radius:3px 3px 0 0;transition:height .5s ease;}
+  .bar.safe{background:var(--green2);}
+  .bar.threat{background:var(--red);opacity:.85;}
+  .bar-lbl{font-family:var(--mono);font-size:9px;color:var(--text3);}
+
+  /* Donut */
+  .donut-wrap{display:flex;align-items:center;gap:20px;}
+  .donut-legend{display:flex;flex-direction:column;gap:8px;}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);}
+  .legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+
+  /* Modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+  .modal-title{font-family:var(--mono);font-size:13px;color:var(--text);font-weight:600;}
+  .modal-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;}
+  .modal-close:hover{color:var(--text);}
+  .modal-body{padding:20px;}
+  .detail-row{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+  .detail-row:last-child{border-bottom:none;}
+  .detail-key{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;min-width:90px;padding-top:1px;}
+  .detail-val{font-size:12px;color:var(--text);flex:1;word-break:break-all;}
+
+  /* Toasts */
+  .toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9000;}
+  .toast{display:flex;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 16px;font-size:12px;color:var(--text);animation:slideIn .2s ease;min-width:240px;}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0;}}
+  .toast.ok{border-left:3px solid var(--green);}
+  .toast.err{border-left:3px solid var(--red);}
+  .toast.info{border-left:3px solid var(--accent);}
+  ::-webkit-scrollbar{width:5px;height:5px;}
+  ::-webkit-scrollbar-track{background:var(--bg2);}
+  ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+  .env-preview{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:14px 16px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.8;white-space:pre;}
+  .env-key{color:var(--accent);}
+  .env-eq{color:var(--text3);}
+  .env-val{color:var(--green);}
+  .env-mask{color:var(--amber);}
+  .spinning{display:inline-block;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .conn-error{background:rgba(255,61,87,.08);border:1px solid rgba(255,61,87,.25);border-radius:6px;padding:12px 16px;font-family:var(--mono);font-size:12px;color:var(--red);margin-bottom:20px;display:none;}
+  .conn-error.show{display:block;}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="logo">PHISH<span>GUARD</span></div>
+    <div class="version">v2.1 — FastAPI</div>
+  </div>
+  <div class="topbar-right">
+    <div class="api-status disconnected" id="api-status">API: connecting…</div>
+    <div class="status-pill">
+      <div class="pulse idle" id="pulse-dot"></div>
+      <span id="status-text">IDLE</span>
+    </div>
+    <div id="clock">--:--:--</div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section">
+      <div class="nav-label">Monitor</div>
+      <div class="nav-item active" data-page="overview"><span class="nav-icon">◈</span> Overview</div>
+      <div class="nav-item" data-page="threats"><span class="nav-icon">⚑</span> Threat Log <span class="nav-badge" id="threat-badge">0</span></div>
+      <div class="nav-item" data-page="activity"><span class="nav-icon">◎</span> Live Logs</div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">
+      <div class="nav-label">Control</div>
+      <div class="nav-item" data-page="scanner"><span class="nav-icon">▶</span> Run Scanner</div>
+      <div class="nav-item" data-page="accounts"><span class="nav-icon">⊞</span> Accounts <span class="nav-badge" id="acct-badge">0</span></div>
+      <div class="nav-item" data-page="settings"><span class="nav-icon">⚙</span> Settings</div>
+      <div class="nav-item" data-page="config"><span class="nav-icon">☰</span> Config / .env</div>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="nav-section">
+      <div class="nav-label">Info</div>
+      <div class="nav-item" data-page="apidocs"><span class="nav-icon">◉</span> API Docs</div>
+    </div>
+  </nav>
+
+  <main class="main">
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <div class="page active" id="page-overview">
+      <div class="section-head">
+        <div class="section-title">OVERVIEW</div>
+        <div class="section-sub" id="last-refresh">—</div>
+        <button class="btn btn-ghost" style="margin-left:auto;font-size:11px;padding:5px 10px" onclick="refreshStats()">↺ Refresh</button>
+      </div>
+      <div class="conn-error" id="conn-error">
+        ⚠ Cannot reach the API at <strong id="api-url-label"></strong>. Start the server with: <code>uvicorn api:app --reload --port 8000</code>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card info"><div class="stat-label">Emails scanned</div><div class="stat-value" id="stat-scanned">—</div><div class="stat-delta">this session</div></div>
+        <div class="stat-card danger"><div class="stat-label">Threats found</div><div class="stat-value" id="stat-threats">—</div><div class="stat-delta">quarantined</div></div>
+        <div class="stat-card warn"><div class="stat-label">SPF / DKIM fail</div><div class="stat-value" id="stat-header-fail">—</div><div class="stat-delta">header issues</div></div>
+        <div class="stat-card ok"><div class="stat-label">Clean emails</div><div class="stat-value" id="stat-clean">—</div><div class="stat-delta">passed all checks</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Scan activity — last 7</div></div>
+          <div class="panel-body"><div class="bar-chart" id="bar-chart"><div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:20px">No scan data yet</div></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Check breakdown</div></div>
+          <div class="panel-body">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 80 80" width="80" height="80" style="flex-shrink:0">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="#1c2330" stroke-width="12"/>
+                <circle id="donut-vt"   cx="40" cy="40" r="32" fill="none" stroke="#ff3d57" stroke-width="12" stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray .5s"/>
+                <circle id="donut-spf"  cx="40" cy="40" r="32" fill="none" stroke="#ffab00" stroke-width="12" stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray .5s"/>
+                <circle id="donut-dkim" cx="40" cy="40" r="32" fill="none" stroke="#00d4ff" stroke-width="12" stroke-dasharray="0 201" stroke-dashoffset="0" transform="rotate(-90 40 40)" style="transition:stroke-dasharray .5s"/>
+              </svg>
+              <div class="donut-legend">
+                <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>VirusTotal hits: <b id="leg-vt" style="color:var(--red);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>SPF failures: <b id="leg-spf" style="color:var(--amber);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>DKIM failures: <b id="leg-dkim" style="color:var(--accent);margin-left:4px">0</b></div>
+                <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Clean: <b id="leg-clean" style="color:var(--green);margin-left:4px">0</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Recent threats</div>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="showPage('threats')">View all →</button>
+        </div>
+        <div style="padding:0">
+          <table class="log-table">
+            <thead><tr><th>Time</th><th>Sender</th><th>Subject</th><th>SPF</th><th>DKIM</th><th>Score</th><th></th></tr></thead>
+            <tbody id="recent-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:28px">No threats detected yet</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ THREAT LOG ═══ -->
+    <div class="page" id="page-threats">
+      <div class="section-head">
+        <div class="section-title">THREAT LOG</div>
+        <div class="section-sub" id="threat-count-label">loading…</div>
+        <button class="btn btn-danger" style="margin-left:auto;font-size:11px;padding:5px 12px" onclick="clearThreats()">Clear log</button>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Flagged emails — from database</div></div>
+        <div style="padding:0">
+          <table class="log-table">
+            <thead><tr><th>Time</th><th>Sender</th><th>Subject</th><th>SPF</th><th>DKIM</th><th>VirusTotal</th><th>Score</th><th></th></tr></thead>
+            <tbody id="threat-tbody"><tr><td colspan="8" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:40px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ LIVE LOGS ═══ -->
+    <div class="page" id="page-activity">
+      <div class="section-head">
+        <div class="section-title">LIVE LOGS</div>
+        <div class="section-sub">Real-time WebSocket feed from the API</div>
+        <button class="btn btn-ghost" style="margin-left:auto;font-size:11px;padding:5px 12px" onclick="clearTerminal()">Clear</button>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">WebSocket — /ws/logs</div>
+          <div id="ws-status" style="font-family:var(--mono);font-size:10px;color:var(--text3)">● disconnected</div>
+        </div>
+        <div class="panel-body"><div class="terminal" id="terminal-log"><span class="t-info">// Connecting to ws://localhost:8000/ws/logs …</span></div></div>
+      </div>
+    </div>
+
+    <!-- ═══ RUN SCANNER ═══ -->
+    <div class="page" id="page-scanner">
+      <div class="section-head"><div class="section-title">RUN SCANNER</div><div class="section-sub">Trigger a real scan via the API</div></div>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Scan controls</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">Scan mode</div>
+              <select id="scan-mode">
+                <option value="full">Full — SPF + DKIM + VirusTotal</option>
+                <option value="headers">Headers only — SPF + DKIM</option>
+                <option value="urls">URLs only — VirusTotal</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Email folder</div>
+              <select id="scan-folder">
+                <option value="inbox">INBOX</option>
+                <option value="spam">SPAM</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Max emails per scan</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="50" value="10" id="max-emails" oninput="document.getElementById('max-val').textContent=this.value"/>
+                <span class="slider-val" id="max-val">10</span>
+              </div>
+            </div>
+            <br/>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="run-btn" onclick="startScan()">▶ Run scan now</button>
+              <button class="btn btn-ghost" onclick="showPage('activity')">◎ Watch logs</button>
+            </div>
+            <div style="margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--text3)" id="scan-status-msg"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Auto-scheduler</div></div>
+          <div class="panel-body">
+            <div class="toggle-row">
+              <div><div class="toggle-label">Enable auto-scan</div><div class="toggle-desc">Calls <code>POST /scheduler/start</code></div></div>
+              <label class="toggle"><input type="checkbox" id="auto-scan-toggle" onchange="toggleScheduler(this.checked)"/><span class="toggle-slider"></span></label>
+            </div>
+            <br/>
+            <div class="field-group">
+              <div class="field-label">Interval (minutes)</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="60" value="5" id="interval-slider" oninput="document.getElementById('interval-val').textContent=this.value"/>
+                <span class="slider-val" id="interval-val">5</span>
+              </div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Scheduler status</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="scheduler-status">● STOPPED</div>
+            </div>
+            <div class="btn-row" style="margin-top:8px">
+              <button class="btn btn-ghost" onclick="stopScheduler()">■ Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SETTINGS ═══ -->
+    <div class="page" id="page-settings">
+      <div class="section-head"><div class="section-title">SETTINGS</div><div class="section-sub">Saved to API — applied immediately</div></div>
+      <div class="control-grid">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Threat scoring</div></div>
+          <div class="panel-body">
+            <div class="field-group">
+              <div class="field-label">Quarantine threshold</div>
+              <div class="slider-row">
+                <input type="range" min="1" max="10" value="3" id="thresh-slider" oninput="document.getElementById('thresh-val').textContent=this.value"/>
+                <span class="slider-val" id="thresh-val">3</span>
+              </div>
+              <div class="field-hint">Email quarantined when score ≥ this value.</div>
+            </div>
+            <div style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px;font-family:var(--mono);font-size:11px;line-height:2;margin-top:8px">
+              <div><span style="color:var(--red)">DKIM fail</span><span style="color:var(--text3)"> ..............+3</span></div>
+              <div><span style="color:var(--amber)">DKIM none</span><span style="color:var(--text3)"> ..............+1</span></div>
+              <div><span style="color:var(--red)">SPF hard fail</span><span style="color:var(--text3)"> .............+3</span></div>
+              <div><span style="color:var(--amber)">SPF soft fail</span><span style="color:var(--text3)"> .............+1</span></div>
+              <div><span style="color:var(--red)">Malicious URL (VT)</span><span style="color:var(--text3)"> .......+5</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Checks enabled</div></div>
+          <div class="panel-body">
+            <div class="toggle-row"><div><div class="toggle-label">SPF verification</div><div class="toggle-desc">DNS lookup on sender domain</div></div><label class="toggle"><input type="checkbox" checked id="tog-spf"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><div><div class="toggle-label">DKIM verification</div><div class="toggle-desc">Cryptographic signature check</div></div><label class="toggle"><input type="checkbox" checked id="tog-dkim"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><div><div class="toggle-label">VirusTotal URL scan</div><div class="toggle-desc">API rate limit: 4 req/min (free)</div></div><label class="toggle"><input type="checkbox" checked id="tog-vt"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><div><div class="toggle-label">Auto-quarantine</div><div class="toggle-desc">Move threats automatically</div></div><label class="toggle"><input type="checkbox" checked id="tog-quarantine"/><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><div><div class="toggle-label">Email alerts</div><div class="toggle-desc">Send alert to ALERT_EMAIL</div></div><label class="toggle"><input type="checkbox" checked id="tog-alert"/><span class="toggle-slider"></span></label></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveSettings()">✓ Save to API</button>
+        <button class="btn btn-ghost" onclick="loadSettings()">↺ Load from API</button>
+      </div>
+    </div>
+
+    <!-- ═══ CONFIG ═══ -->
+    <div class="page" id="page-config">
+      <div class="section-head"><div class="section-title">CONFIG / .ENV</div><div class="section-sub">Writes .env via POST /config/save</div></div>
+      <div class="control-grid">
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Email credentials</div></div>
+          <div class="panel-body">
+            <div class="field-group"><div class="field-label">EMAIL_ADDRESS</div><input type="email" id="cfg-email" placeholder="you@gmail.com"/></div>
+            <div class="field-group"><div class="field-label">EMAIL_PASSWORD (App Password)</div><input type="password" id="cfg-pass" placeholder="xxxx xxxx xxxx xxxx"/><div class="field-hint">Gmail → Security → App Passwords</div></div>
+            <div class="field-group"><div class="field-label">IMAP_SERVER</div><input type="text" id="cfg-imap" value="imap.gmail.com"/></div>
+            <div class="field-group"><div class="field-label">IMAP_PORT</div><input type="number" id="cfg-imap-port" value="993"/></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><div class="panel-title">Alert &amp; API keys</div></div>
+          <div class="panel-body">
+            <div class="field-group"><div class="field-label">ALERT_EMAIL</div><input type="email" id="cfg-alert-email" placeholder="security@yourorg.com"/></div>
+            <div class="field-group"><div class="field-label">SMTP_USER</div><input type="email" id="cfg-smtp-user" placeholder="sender@gmail.com"/></div>
+            <div class="field-group"><div class="field-label">SMTP_PASSWORD</div><input type="password" id="cfg-smtp-pass" placeholder="App password"/></div>
+            <div class="field-group"><div class="field-label">VIRUSTOTAL_API_KEY</div><input type="password" id="cfg-vt-key" placeholder="Your VirusTotal API key"/></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><div class="panel-title">.env preview</div><button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="copyEnv()">⎘ Copy</button></div>
+        <div class="panel-body"><div class="env-preview" id="env-preview">—</div></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="saveConfig()">⬆ Save to server (.env)</button>
+        <button class="btn btn-ghost" onclick="refreshEnvPreview()">↺ Refresh preview</button>
+      </div>
+    </div>
+
+    <!-- ═══ ACCOUNTS ═══ -->
+    <div class="page" id="page-accounts">
+      <div class="section-head">
+        <div class="section-title">ACCOUNTS</div>
+        <div class="section-sub">Multi-inbox monitoring</div>
+        <button class="btn btn-primary" style="margin-left:auto;font-size:11px;padding:6px 14px" onclick="openAddModal()">+ Add account</button>
+      </div>
+
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-head"><div class="panel-title">Monitored inboxes</div><button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="loadAccounts()">↺ Refresh</button></div>
+        <div style="padding:0">
+          <table class="log-table">
+            <thead><tr><th>Label</th><th>Email</th><th>Server</th><th>Status</th><th>Last scan</th><th>Threats</th><th>Actions</th></tr></thead>
+            <tbody id="acct-tbody"><tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:32px">No accounts yet — click Add account</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Add account form (inline, toggleable) -->
+      <div class="panel" id="add-acct-panel" style="display:none">
+        <div class="panel-head">
+          <div class="panel-title">Add new account</div>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="closeAddModal()">✕ Cancel</button>
+        </div>
+        <div class="panel-body">
+          <div class="control-grid">
+            <div>
+              <div class="field-group"><div class="field-label">Label (optional)</div><input type="text" id="na-label" placeholder="e.g. Work, Personal"/></div>
+              <div class="field-group"><div class="field-label">Email address</div><input type="email" id="na-email" placeholder="you@gmail.com"/></div>
+              <div class="field-group"><div class="field-label">App password</div><input type="password" id="na-pass" placeholder="Gmail App Password"/><div class="field-hint">Gmail → Security → App Passwords</div></div>
+            </div>
+            <div>
+              <div class="field-group"><div class="field-label">IMAP server</div><input type="text" id="na-imap" value="imap.gmail.com"/></div>
+              <div class="field-group"><div class="field-label">IMAP port</div><input type="number" id="na-port" value="993"/></div>
+              <div class="field-group" style="margin-top:8px">
+                <div class="toggle-row" style="padding:0;border:none">
+                  <div><div class="toggle-label">Enable immediately</div></div>
+                  <label class="toggle"><input type="checkbox" id="na-enabled" checked/><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="btn-row" style="margin-top:8px">
+            <button class="btn btn-primary" onclick="addAccount()">✓ Add &amp; test connection</button>
+            <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
+          </div>
+          <div style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text3)" id="add-acct-msg"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ API DOCS ═══ -->
+    <div class="page" id="page-apidocs">
+      <div class="section-head"><div class="section-title">API DOCS</div><div class="section-sub">Auto-generated by FastAPI</div></div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Endpoints</div></div>
+        <div style="padding:0">
+          <table class="log-table">
+            <thead><tr><th>Method</th><th>Path</th><th>Description</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge info">GET</span></td><td class="mono">/stats</td><td>Session statistics</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/stats')">Test</button></td></tr>
+              <tr><td><span class="badge info">GET</span></td><td class="mono">/threats</td><td>Paginated threat log</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/threats')">Test</button></td></tr>
+              <tr><td><span class="badge warn">POST</span></td><td class="mono">/scan</td><td>Trigger a scan</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/scan','POST',{mode:'full',max_emails:5})">Test</button></td></tr>
+              <tr><td><span class="badge warn">POST</span></td><td class="mono">/scheduler/start</td><td>Start auto-scheduler</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/scheduler/start','POST',{interval_minutes:5})">Test</button></td></tr>
+              <tr><td><span class="badge warn">POST</span></td><td class="mono">/scheduler/stop</td><td>Stop auto-scheduler</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/scheduler/stop','POST',{})">Test</button></td></tr>
+              <tr><td><span class="badge info">GET</span></td><td class="mono">/settings</td><td>Current settings</td><td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testEndpoint('/settings')">Test</button></td></tr>
+              <tr><td><span class="badge warn">POST</span></td><td class="mono">/settings</td><td>Update settings</td><td></td></tr>
+              <tr><td><span class="badge warn">POST</span></td><td class="mono">/config/save</td><td>Write .env file</td><td></td></tr>
+              <tr><td><span class="badge fail">DELETE</span></td><td class="mono">/threats</td><td>Clear threat log</td><td></td></tr>
+              <tr><td><span class="badge info">WS</span></td><td class="mono">/ws/logs</td><td>Real-time log stream</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <br/>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">API test output</div><button class="btn btn-ghost" style="font-size:11px;padding:4px 10px" onclick="document.getElementById('api-test-out').textContent=''">Clear</button></div>
+        <div class="panel-body"><pre id="api-test-out" style="font-family:var(--mono);font-size:11px;color:var(--text2);white-space:pre-wrap;max-height:300px;overflow-y:auto">Click Test on any endpoint above…</pre></div>
+      </div>
+      <br/>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">Interactive docs</div></div>
+        <div class="panel-body">
+          <p style="color:var(--text2);font-size:13px;margin-bottom:12px">FastAPI auto-generates full Swagger UI and ReDoc docs:</p>
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="window.open(API_BASE+'/docs','_blank')">◉ Swagger UI (/docs)</button>
+            <button class="btn btn-ghost" onclick="window.open(API_BASE+'/redoc','_blank')">◉ ReDoc (/redoc)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Threat detail modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title">Threat detail</div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  Config — change port here if needed
+// ─────────────────────────────────────────────
+const API_BASE = "http://localhost:8000";
+const WS_URL   = "ws://localhost:8000/ws/logs";
+
+document.getElementById('api-url-label').textContent = API_BASE;
+
+// ─────────────────────────────────────────────
+//  Clock
+// ─────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-GB', {hour12:false});
+}, 1000);
+
+// ─────────────────────────────────────────────
+//  Navigation
+// ─────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelector(`[data-page="${name}"]`).classList.add('active');
+  if (name === 'threats') loadThreats();
+  if (name === 'settings') loadSettings();
+  if (name === 'config') refreshEnvPreview();
+  if (name === 'accounts') loadAccounts();
+}
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => showPage(el.dataset.page));
+});
+
+// ─────────────────────────────────────────────
+//  Toast
+// ─────────────────────────────────────────────
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ─────────────────────────────────────────────
+//  API helpers
+// ─────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API_BASE + path, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ─────────────────────────────────────────────
+//  API connection indicator
+// ─────────────────────────────────────────────
+async function checkAPIConnection() {
+  try {
+    await api('/health');
+    document.getElementById('api-status').textContent = 'API: connected';
+    document.getElementById('api-status').className = 'api-status connected';
+    document.getElementById('conn-error').classList.remove('show');
+    return true;
+  } catch {
+    document.getElementById('api-status').textContent = 'API: offline';
+    document.getElementById('api-status').className = 'api-status disconnected';
+    document.getElementById('conn-error').classList.add('show');
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Stats polling
+// ─────────────────────────────────────────────
+async function refreshStats() {
+  const ok = await checkAPIConnection();
+  if (!ok) return;
+  try {
+    const s = await api('/stats');
+    document.getElementById('stat-scanned').textContent    = s.scanned;
+    document.getElementById('stat-threats').textContent    = s.threats;
+    document.getElementById('stat-header-fail').textContent= s.header_fails;
+    document.getElementById('stat-clean').textContent      = s.clean;
+    document.getElementById('threat-badge').textContent    = s.threats;
+    document.getElementById('leg-vt').textContent          = s.vt_hits;
+    document.getElementById('leg-spf').textContent         = s.spf_fails;
+    document.getElementById('leg-dkim').textContent        = s.dkim_fails;
+    document.getElementById('leg-clean').textContent       = s.clean;
+    document.getElementById('last-refresh').textContent    =
+      'Last update: ' + new Date().toLocaleTimeString('en-GB',{hour12:false});
+    updateDonut(s.vt_hits, s.spf_fails, s.dkim_fails, s.clean);
+    updateBarChart(s.scan_history || []);
+    // Scanner status
+    const dot  = document.getElementById('pulse-dot');
+    const stxt = document.getElementById('status-text');
+    if (s.scan_running) {
+      dot.className  = 'pulse scanning';
+      stxt.textContent = 'SCANNING';
+      document.getElementById('run-btn').disabled = true;
+    } else {
+      dot.className  = 'pulse';
+      stxt.textContent = 'IDLE';
+      document.getElementById('run-btn').disabled = false;
+    }
+    // Scheduler indicator
+    const schEl = document.getElementById('scheduler-status');
+    if (s.scheduler_running) {
+      schEl.innerHTML = `<span style="color:var(--green)">● RUNNING</span> — every ${s.scheduler_interval} min`;
+      document.getElementById('auto-scan-toggle').checked = true;
+    } else {
+      schEl.innerHTML = `<span style="color:var(--text3)">● STOPPED</span>`;
+    }
+    // Refresh recent threats table
+    await loadRecentThreats();
+  } catch(e) {
+    console.warn('Stats fetch failed:', e);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Donut + bar chart
+// ─────────────────────────────────────────────
+function updateDonut(vt, spf, dkim, clean) {
+  const total = vt + spf + dkim + clean;
+  if (!total) return;
+  const C = 201;
+  const vtS   = (vt  / total) * C;
+  const spfS  = (spf / total) * C;
+  const dkimS = (dkim/ total) * C;
+  document.getElementById('donut-vt').setAttribute('stroke-dasharray',  `${vtS} ${C-vtS}`);
+  document.getElementById('donut-spf').setAttribute('stroke-dasharray', `${spfS} ${C-spfS}`);
+  document.getElementById('donut-spf').setAttribute('stroke-dashoffset', -vtS);
+  document.getElementById('donut-dkim').setAttribute('stroke-dasharray',`${dkimS} ${C-dkimS}`);
+  document.getElementById('donut-dkim').setAttribute('stroke-dashoffset',-(vtS+spfS));
+}
+
+function updateBarChart(history) {
+  const chart = document.getElementById('bar-chart');
+  const last7 = history.slice(-7);
+  if (!last7.length) { chart.innerHTML='<div style="color:var(--text3);font-family:var(--mono);font-size:11px;padding:20px">No scan data yet</div>'; return; }
+  const maxT = Math.max(...last7.map(s=>s.safe+s.threat), 1);
+  chart.innerHTML = last7.map((s,i)=>{
+    const sh = Math.round((s.safe  / maxT)*80);
+    const th = Math.round((s.threat/ maxT)*80);
+    return `<div class="bar-col">
+      <div class="bar threat" style="height:${th}px"></div>
+      <div class="bar safe"   style="height:${sh}px"></div>
+      <div class="bar-lbl">${s.ts||('#'+(i+1))}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+//  Threat tables
+// ─────────────────────────────────────────────
+function spfBadge(r){const m={pass:'pass',softfail:'warn',fail:'fail',neutral:'none'};return `<span class="badge ${m[r]||'none'}">${r||'—'}</span>`;}
+function dkimBadge(r){const m={pass:'pass',fail:'fail',none:'none'};return `<span class="badge ${m[r]||'none'}">${r||'—'}</span>`;}
+function scoreBar(s){const pct=Math.min((s/11)*100,100);const col=s>=5?'var(--red)':s>=3?'var(--amber)':'var(--green)';return `<div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:${pct}%;background:${col}"></div></div><span class="score-num" style="color:${col}">${s}</span></div>`;}
+
+async function loadThreats() {
+  try {
+    const data = await api('/threats?limit=100');
+    document.getElementById('threat-count-label').textContent = `${data.total} records`;
+    const tbody = document.getElementById('threat-tbody');
+    if (!data.threats.length) {
+      tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:40px">No threats logged yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.threats.map(t=>`
+      <tr>
+        <td class="mono">${t.timestamp||'—'}</td>
+        <td class="sender">${t.sender||'—'}</td>
+        <td class="subject">${t.subject||'—'}</td>
+        <td>${spfBadge(t.spf)}</td>
+        <td>${dkimBadge(t.dkim)}</td>
+        <td>${t.vt_hit?'<span class="badge fail">hit</span>':'<span class="badge none">clean</span>'}</td>
+        <td>${scoreBar(t.score||0)}</td>
+        <td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick='openModal(${JSON.stringify(t)})'>detail</button></td>
+      </tr>`).join('');
+  } catch(e) {
+    document.getElementById('threat-tbody').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;color:var(--red);font-family:var(--mono);padding:40px">API unavailable</td></tr>';
+  }
+}
+
+async function loadRecentThreats() {
+  try {
+    const data = await api('/threats?limit=5');
+    const tbody = document.getElementById('recent-tbody');
+    if (!data.threats.length) {
+      tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:28px">No threats detected yet</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.threats.map(t=>`
+      <tr>
+        <td class="mono">${(t.timestamp||'').split(' ')[1]||'—'}</td>
+        <td class="sender">${t.sender||'—'}</td>
+        <td class="subject">${t.subject||'—'}</td>
+        <td>${spfBadge(t.spf)}</td>
+        <td>${dkimBadge(t.dkim)}</td>
+        <td>${scoreBar(t.score||0)}</td>
+        <td><button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick='openModal(${JSON.stringify(t)})'>→</button></td>
+      </tr>`).join('');
+  } catch{}
+}
+
+async function clearThreats() {
+  if (!confirm('Clear all threat records from the database?')) return;
+  try {
+    await api('/threats','DELETE');
+    toast('Threat log cleared.','info');
+    await loadThreats();
+    await refreshStats();
+  } catch(e) { toast('Failed: ' + e.message,'err'); }
+}
+
+// ─────────────────────────────────────────────
+//  Modal
+// ─────────────────────────────────────────────
+function openModal(t) {
+  const flags = Array.isArray(t.flags) ? t.flags : (JSON.parse(t.flags||'[]'));
+  document.getElementById('modal-body').innerHTML=`
+    <div class="detail-row"><div class="detail-key">Time</div><div class="detail-val mono">${t.timestamp||'—'}</div></div>
+    <div class="detail-row"><div class="detail-key">From</div><div class="detail-val">${t.sender||'—'}</div></div>
+    <div class="detail-row"><div class="detail-key">Subject</div><div class="detail-val">${t.subject||'—'}</div></div>
+    <div class="detail-row"><div class="detail-key">SPF</div><div class="detail-val">${spfBadge(t.spf)}</div></div>
+    <div class="detail-row"><div class="detail-key">DKIM</div><div class="detail-val">${dkimBadge(t.dkim)}</div></div>
+    <div class="detail-row"><div class="detail-key">VirusTotal</div><div class="detail-val">${t.vt_hit?'<span class="badge fail">Malicious URL</span>':'<span class="badge pass">Clean</span>'}</div></div>
+    <div class="detail-row"><div class="detail-key">Score</div><div class="detail-val">${scoreBar(t.score||0)}</div></div>
+    <div class="detail-row"><div class="detail-key">Flags</div><div class="detail-val">${flags.map(f=>`<div>• ${f}</div>`).join('')||'—'}</div></div>
+    <div class="detail-row"><div class="detail-key">Action</div><div class="detail-val"><span class="badge fail">Quarantined + Alerted</span></div></div>`;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
+
+// ─────────────────────────────────────────────
+//  Scanner
+// ─────────────────────────────────────────────
+async function startScan() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Starting…';
+  const msg = document.getElementById('scan-status-msg');
+  try {
+    const res = await api('/scan','POST',{
+      mode:       document.getElementById('scan-mode').value,
+      folder:     document.getElementById('scan-folder').value,
+      max_emails: parseInt(document.getElementById('max-emails').value),
+    });
+    if (res.status === 'already_running') {
+      toast('Scan already running.','info');
+    } else {
+      toast('Scan started — watch Live Logs for output.','ok');
+      msg.textContent = '▶ Scan running — switch to Live Logs tab to watch.';
+      showPage('activity');
+    }
+  } catch(e) {
+    toast('Failed to start scan: ' + e.message,'err');
+    msg.textContent = '✕ Error: ' + e.message;
+    btn.disabled = false;
+  }
+  btn.textContent = '▶ Run scan now';
+}
+
+// ─────────────────────────────────────────────
+//  Scheduler
+// ─────────────────────────────────────────────
+async function toggleScheduler(on) {
+  if (on) await startScheduler();
+  else    await stopScheduler();
+}
+
+async function startScheduler() {
+  const mins = parseInt(document.getElementById('interval-slider').value);
+  try {
+    await api('/scheduler/start','POST',{interval_minutes: mins});
+    toast(`Scheduler started — every ${mins} min.`,'ok');
+    document.getElementById('scheduler-status').innerHTML =
+      `<span style="color:var(--green)">● RUNNING</span> — every ${mins} min`;
+  } catch(e) { toast('Failed: '+e.message,'err'); }
+}
+
+async function stopScheduler() {
+  try {
+    await api('/scheduler/stop','POST',{});
+    toast('Scheduler stopped.','info');
+    document.getElementById('scheduler-status').innerHTML =
+      `<span style="color:var(--text3)">● STOPPED</span>`;
+    document.getElementById('auto-scan-toggle').checked = false;
+  } catch(e) { toast('Failed: '+e.message,'err'); }
+}
+
+// ─────────────────────────────────────────────
+//  Settings
+// ─────────────────────────────────────────────
+async function loadSettings() {
+  try {
+    const s = await api('/settings');
+    document.getElementById('thresh-slider').value        = s.threshold;
+    document.getElementById('thresh-val').textContent     = s.threshold;
+    document.getElementById('tog-spf').checked        = s.enable_spf;
+    document.getElementById('tog-dkim').checked       = s.enable_dkim;
+    document.getElementById('tog-vt').checked         = s.enable_vt;
+    document.getElementById('tog-quarantine').checked = s.enable_quarantine;
+    document.getElementById('tog-alert').checked      = s.enable_alerts;
+  } catch(e) { toast('Could not load settings: '+e.message,'err'); }
+}
+
+async function saveSettings() {
+  try {
+    await api('/settings','POST',{
+      threshold:         parseInt(document.getElementById('thresh-slider').value),
+      enable_spf:        document.getElementById('tog-spf').checked,
+      enable_dkim:       document.getElementById('tog-dkim').checked,
+      enable_vt:         document.getElementById('tog-vt').checked,
+      enable_quarantine: document.getElementById('tog-quarantine').checked,
+      enable_alerts:     document.getElementById('tog-alert').checked,
+    });
+    toast('Settings saved to API.','ok');
+  } catch(e) { toast('Failed: '+e.message,'err'); }
+}
+
+// ─────────────────────────────────────────────
+//  Config / .env
+// ─────────────────────────────────────────────
+function mask(v){if(!v)return'""';if(v.length<=4)return'"****"';return'"'+v.slice(0,2)+'*'.repeat(Math.min(v.length-2,6))+'"';}
+
+function refreshEnvPreview(){
+  const e=document.getElementById('cfg-email').value;
+  const p=document.getElementById('cfg-pass').value;
+  const im=document.getElementById('cfg-imap').value||'imap.gmail.com';
+  const ip=document.getElementById('cfg-imap-port').value||'993';
+  const ae=document.getElementById('cfg-alert-email').value;
+  const su=document.getElementById('cfg-smtp-user').value;
+  const sp=document.getElementById('cfg-smtp-pass').value;
+  const vt=document.getElementById('cfg-vt-key').value;
+  document.getElementById('env-preview').innerHTML=
+    `<span class="env-key">EMAIL_ADDRESS</span><span class="env-eq">=</span><span class="env-val">"${e||'your@gmail.com'}"</span>
+<span class="env-key">EMAIL_PASSWORD</span><span class="env-eq">=</span><span class="env-mask">${mask(p)}</span>
+<span class="env-key">IMAP_SERVER</span><span class="env-eq">=</span><span class="env-val">"${im}"</span>
+<span class="env-key">IMAP_PORT</span><span class="env-eq">=</span><span class="env-val">${ip}</span>
+
+<span class="env-key">ALERT_EMAIL</span><span class="env-eq">=</span><span class="env-val">"${ae||'security@yourorg.com'}"</span>
+<span class="env-key">SMTP_USER</span><span class="env-eq">=</span><span class="env-val">"${su||'sender@gmail.com'}"</span>
+<span class="env-key">SMTP_PASSWORD</span><span class="env-eq">=</span><span class="env-mask">${mask(sp)}</span>
+<span class="env-key">SMTP_SERVER</span><span class="env-eq">=</span><span class="env-val">"smtp.gmail.com"</span>
+<span class="env-key">SMTP_PORT</span><span class="env-eq">=</span><span class="env-val">587</span>
+
+<span class="env-key">VIRUSTOTAL_API_KEY</span><span class="env-eq">=</span><span class="env-mask">${mask(vt)}</span>`;
+}
+
+async function saveConfig() {
+  try {
+    await api('/config/save','POST',{
+      EMAIL_ADDRESS:     document.getElementById('cfg-email').value,
+      EMAIL_PASSWORD:    document.getElementById('cfg-pass').value,
+      IMAP_SERVER:       document.getElementById('cfg-imap').value,
+      IMAP_PORT:         parseInt(document.getElementById('cfg-imap-port').value)||993,
+      ALERT_EMAIL:       document.getElementById('cfg-alert-email').value,
+      SMTP_USER:         document.getElementById('cfg-smtp-user').value,
+      SMTP_PASSWORD:     document.getElementById('cfg-smtp-pass').value,
+      VIRUSTOTAL_API_KEY:document.getElementById('cfg-vt-key').value,
+    });
+    toast('.env saved and reloaded on server.','ok');
+  } catch(e) { toast('Failed: '+e.message,'err'); }
+}
+
+function copyEnv(){
+  navigator.clipboard.writeText(document.getElementById('env-preview').innerText)
+    .then(()=>toast('Copied.','ok'));
+}
+
+['cfg-email','cfg-pass','cfg-imap','cfg-imap-port',
+ 'cfg-alert-email','cfg-smtp-user','cfg-smtp-pass','cfg-vt-key']
+.forEach(id=>{const el=document.getElementById(id);if(el)el.addEventListener('input',refreshEnvPreview);});
+
+// ─────────────────────────────────────────────
+//  API test (docs page)
+// ─────────────────────────────────────────────
+async function testEndpoint(path, method='GET', body=null) {
+  const out = document.getElementById('api-test-out');
+  out.textContent = `→ ${method} ${API_BASE}${path}\n\nLoading…`;
+  try {
+    const data = await api(path, method, body);
+    out.textContent = `→ ${method} ${API_BASE}${path}\n\n${JSON.stringify(data, null, 2)}`;
+  } catch(e) {
+    out.textContent = `→ ${method} ${API_BASE}${path}\n\n✕ Error: ${e.message}`;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  WebSocket — real-time logs
+// ─────────────────────────────────────────────
+let ws = null;
+let wsReconnectTimer = null;
+
+function connectWebSocket() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  try {
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      document.getElementById('ws-status').innerHTML =
+        '<span style="color:var(--green)">● connected</span>';
+      termLog('WebSocket connected to ' + WS_URL, 't-ok');
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'connected') return;
+        const cls = {ok:'t-ok', warn:'t-warn', err:'t-err', info:'t-info'}[msg.level] || '';
+        termLog(msg.text, cls, msg.ts);
+        // Live stat bump on events
+        if (msg.event === 'threat')    { refreshStats(); }
+        if (msg.event === 'scan_done') { refreshStats(); toast(`Scan done — ${msg.threats} threat(s).`, msg.threats > 0 ? 'err' : 'ok'); }
+      } catch {}
+    };
+    ws.onclose = () => {
+      document.getElementById('ws-status').innerHTML =
+        '<span style="color:var(--text3)">● disconnected</span>';
+      termLog('WebSocket disconnected. Reconnecting in 5s…', 't-warn');
+      wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+    };
+    ws.onerror = () => {
+      termLog('WebSocket error — is the API server running?', 't-err');
+    };
+  } catch(e) {
+    termLog('Could not connect WebSocket: ' + e.message, 't-err');
+    wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+  }
+}
+
+function termLog(text, cls='', ts=null) {
+  const t = document.getElementById('terminal-log');
+  const time = ts || new Date().toLocaleTimeString('en-GB',{hour12:false});
+  t.innerHTML += `\n<span class="t-time">[${time}]</span> <span class="${cls}">${text}</span>`;
+  t.scrollTop = t.scrollHeight;
+}
+
+function clearTerminal() {
+  document.getElementById('terminal-log').innerHTML =
+    '<span class="t-info">// Log cleared.</span>';
+}
+
+// ─────────────────────────────────────────────
+//  Accounts
+// ─────────────────────────────────────────────
+async function loadAccounts() {
+  try {
+    const data = await api('/accounts');
+    const accounts = data.accounts || [];
+    document.getElementById('acct-badge').textContent = accounts.length;
+    const tbody = document.getElementById('acct-tbody');
+    if (!accounts.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text3);font-family:var(--mono);padding:32px">No accounts yet — click Add account</td></tr>';
+      return;
+    }
+    tbody.innerHTML = accounts.map(a => {
+      const enabled = a.enabled ? '<span class="badge pass">active</span>' : '<span class="badge none">disabled</span>';
+      const lastScan = a.last_scan || '—';
+      const lastErr  = a.last_error ? `<div style="color:var(--red);font-size:10px;font-family:var(--mono);margin-top:2px">${a.last_error.slice(0,60)}</div>` : '';
+      return `<tr>
+        <td>${a.label || '<span style="color:var(--text3)">—</span>'}</td>
+        <td class="mono sender">${a.email}</td>
+        <td class="mono">${a.imap_server}:${a.imap_port}</td>
+        <td>${enabled}${lastErr}</td>
+        <td class="mono" style="font-size:11px">${lastScan}</td>
+        <td><span style="color:var(--red);font-family:var(--mono)">${a.threats||0}</span></td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="testAccount(${a.id})">Test</button>
+            <button class="btn btn-ghost" style="font-size:10px;padding:3px 8px" onclick="toggleAccount(${a.id},${a.enabled})">${a.enabled ? 'Disable' : 'Enable'}</button>
+            <button class="btn btn-danger" style="font-size:10px;padding:3px 8px" onclick="deleteAccount(${a.id},'${a.email}')">✕</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('acct-tbody').innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:var(--red);font-family:var(--mono);padding:32px">API unavailable</td></tr>';
+  }
+}
+
+function openAddModal() {
+  document.getElementById('add-acct-panel').style.display = 'block';
+  document.getElementById('add-acct-msg').textContent = '';
+  document.getElementById('na-email').focus();
+}
+function closeAddModal() {
+  document.getElementById('add-acct-panel').style.display = 'none';
+}
+
+async function addAccount() {
+  const msg = document.getElementById('add-acct-msg');
+  const email = document.getElementById('na-email').value.trim();
+  const pass  = document.getElementById('na-pass').value;
+  if (!email || !pass) { msg.textContent = '✕ Email and password are required.'; return; }
+  msg.textContent = '⏳ Testing connection…';
+  try {
+    await api('/accounts', 'POST', {
+      label:       document.getElementById('na-label').value,
+      email,
+      password:    pass,
+      imap_server: document.getElementById('na-imap').value || 'imap.gmail.com',
+      imap_port:   parseInt(document.getElementById('na-port').value) || 993,
+      enabled:     document.getElementById('na-enabled').checked,
+    });
+    msg.textContent = '';
+    toast(`Account ${email} added.`, 'ok');
+    closeAddModal();
+    // Clear form
+    ['na-label','na-email','na-pass'].forEach(id => document.getElementById(id).value = '');
+    await loadAccounts();
+  } catch(e) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = '✕ ' + e.message;
+    toast('Failed to add account: ' + e.message, 'err');
+  }
+}
+
+async function deleteAccount(id, email) {
+  if (!confirm(`Remove ${email} from monitoring?`)) return;
+  try {
+    await api(`/accounts/${id}`, 'DELETE');
+    toast(`${email} removed.`, 'info');
+    await loadAccounts();
+  } catch(e) { toast('Failed: ' + e.message, 'err'); }
+}
+
+async function testAccount(id) {
+  toast('Testing connection…', 'info');
+  try {
+    const res = await api(`/accounts/${id}/test`, 'POST', {});
+    toast(`✓ ${res.email} — ${res.unread} unread`, 'ok');
+    await loadAccounts();
+  } catch(e) { toast('Test failed: ' + e.message, 'err'); await loadAccounts(); }
+}
+
+async function toggleAccount(id, currentEnabled) {
+  try {
+    const tbody = document.getElementById('acct-tbody');
+    const acctRow = [...tbody.querySelectorAll('tr')];
+    // get current label and server from state
+    const data = await api('/accounts');
+    const acct = (data.accounts||[]).find(a => a.id === id);
+    if (!acct) return;
+    await api(`/accounts/${id}`, 'PATCH', {
+      label: acct.label || '',
+      enabled: !currentEnabled,
+      imap_server: acct.imap_server,
+      imap_port: acct.imap_port,
+    });
+    toast(`Account ${currentEnabled ? 'disabled' : 'enabled'}.`, 'info');
+    await loadAccounts();
+  } catch(e) { toast('Failed: ' + e.message, 'err'); }
+}
+
+// ─────────────────────────────────────────────
+//  Boot sequence
+// ─────────────────────────────────────────────
+(async function init() {
+  refreshEnvPreview();
+  await checkAPIConnection();
+  await refreshStats();
+  await loadAccounts();
+  connectWebSocket();
+  // Poll stats every 15 s
+  setInterval(refreshStats, 15000);
+  setInterval(loadAccounts, 30000);
+})();
+</script>
+</body>
+</html>

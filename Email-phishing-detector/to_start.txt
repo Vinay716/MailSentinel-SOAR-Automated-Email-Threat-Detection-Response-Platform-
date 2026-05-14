@@ -1,0 +1,18 @@
+to start 
+go to directory 
+now to start evn write .\.venv\Scripts\Activate.ps1
+now to start the project write python main.py
+
+pip install -r requirements.txt
+
+TO START BACKEND:- uvicorn api:app --reload --port 8000    
+Tstart front end open dashboard.html in your browser 
+
+then everything will go live 
+
+
+# Know
+How API worked
+
+
+
